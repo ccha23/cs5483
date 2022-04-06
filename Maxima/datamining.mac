@@ -1051,3 +1051,49 @@ block(
     ),
     lst
 )$
+
+
+/*
+Bottom-up construction of iceberg cube where
+- data is the base cuboid with
+- dims is the dimensions names,
+- fact is the name of the fact, and 
+- min_sup is the minimum value of fact for the iceberg condition.
+*/
+BUC(data, dims, fact, min_sup):=
+block(
+    [
+        out: [],
+        fns: feature_names(data),
+        _BUC: lambda(
+            [input, ns_dims, dim],
+            block(
+                [
+                    s:apply("+",feature_values(input, fact)),
+                    c, t
+                ],
+                if s>=min_sup then
+                (
+                    c: map(
+                        lambda([fn,v],
+                            if elementp(fn, ns_dims) then v else 
+                            if equal(fn,fact) then s else
+                            "*"
+                        ),
+                        fns, args(all_feature_values(input))[1]
+                    ),
+                    out:endcons(c, out),
+                    for i:dim thru length(dims) do
+                    (
+                        t: split_data(input, dims[i]),
+                        /* print(input, ns_dims, dims[i], c, t), */
+                        for j:1 thru length(t[2]) do
+                        apply(_BUC, [t[2][j], adjoin(dims[i], ns_dims), i+1])
+                    )
+                )
+            )
+        )
+    ],
+    apply(_BUC, [data, {}, 1]),
+    build_data_from_list(fns, out)
+)$
